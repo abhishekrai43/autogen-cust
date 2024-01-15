@@ -112,7 +112,7 @@ class ConversableAgent(Agent):
             else (lambda x: content_str(x.get("content")) == "TERMINATE")
         )
 
-        openrouter_api_key = os.getenv('OPENAI_API_KEY', '')  # Replace with a default or error if not found
+        openrouter_api_key = os.environ.get('OPENAI_API_KEY', '')  # Replace with a default or error if not found
         self.client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=openrouter_api_key,
