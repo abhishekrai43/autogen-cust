@@ -50,10 +50,6 @@ class GroupChat:
         """Reset the group chat."""
         self.messages.clear()    
 
-    on_manual_select_speaker: Optional[Callable[[List[Agent]], None]] = None
-    def set_on_manual_select_speaker_callback(self, callback):
-        print("call back from groupchat")
-        self.on_manual_select_speaker = callback
 
     def append(self, message: Dict):
         """Append a message to the group chat.
@@ -100,17 +96,8 @@ Then select the next role from {[agent.name for agent in agents]} to play. Only 
             agents = self.agents
         return f"Read the above conversation. Then select the next role from {[agent.name for agent in agents]} to play. Only return the role."
 
-    def manual_select_speaker(self, agents: Optional[List[Agent]] = None) -> Union[Agent, None]:
-        print("In groupchat manual select")
-        print("on manual",self.on_manual_select_speaker)
-        """Manually select the next speaker."""
-        if self.speaker_selection_method.lower() == "manual" and self.on_manual_select_speaker:
-            if "Standby_Agent" not in [agent.name for agent in agents]:
-                standby_agent = self.agent_by_name("Standby_Agent")
-                agents.append(standby_agent)
-            print("Triggering manual speaker selection callback")
-            return self.on_manual_select_speaker(agents)
-        
+    async def manual_select_speaker(self, agents: Optional[List[Agent]] = None) -> Union[Agent, None]:
+       
         if agents is None:
             agents = self.agents
 
@@ -131,14 +118,14 @@ Then select the next role from {[agent.name for agent in agents]} to play. Only 
                     break
                 i = int(i)
                 if i > 0 and i <= _n_agents:
-                    return agents[i - 1]
+                    return await agents[i - 1]
                 else:
                     raise ValueError
             except ValueError:
                 print(f"Invalid input. Please enter a number between 1 and {_n_agents}.")
         return None
 
-    def _prepare_and_select_agents(self, last_speaker: Agent) -> Tuple[Optional[Agent], List[Agent]]:
+    async def _prepare_and_select_agents(self, last_speaker: Agent) -> Tuple[Optional[Agent], List[Agent]]:
         if self.speaker_selection_method.lower() not in self._VALID_SPEAKER_SELECTION_METHODS:
             raise ValueError(
                 f"GroupChat speaker_selection_method is set to '{self.speaker_selection_method}'. "
@@ -200,7 +187,7 @@ Then select the next role from {[agent.name for agent in agents]} to play. Only 
         # remove the last speaker from the list to avoid selecting the same speaker if allow_repeat_speaker is False
         agents = agents if allow_repeat_speaker else [agent for agent in agents if agent != last_speaker]
         if self.speaker_selection_method.lower() == "manual":
-            selected_agent = self.manual_select_speaker(agents)
+            selected_agent = await self.manual_select_speaker(agents)
         elif self.speaker_selection_method.lower() == "round_robin":
             selected_agent = self.next_agent(last_speaker, agents)
         elif self.speaker_selection_method.lower() == "random":
@@ -209,9 +196,9 @@ Then select the next role from {[agent.name for agent in agents]} to play. Only 
             selected_agent = None
         return selected_agent, agents
 
-    def select_speaker(self, last_speaker: Agent, selector: ConversableAgent):
+    async def select_speaker(self, last_speaker: Agent, selector: ConversableAgent):
         """Select the next speaker."""
-        selected_agent, agents = self._prepare_and_select_agents(last_speaker)
+        selected_agent, agents = await self._prepare_and_select_agents(last_speaker)
         if selected_agent:
             return selected_agent
         # auto speaker selection
@@ -247,7 +234,7 @@ Then select the next role from {[agent.name for agent in agents]} to play. Only 
 
     async def a_select_speaker(self, last_speaker: Agent, selector: ConversableAgent):
         """Select the next speaker."""
-        selected_agent, agents = self._prepare_and_select_agents(last_speaker)
+        selected_agent, agents = await self._prepare_and_select_agents(last_speaker)
         if selected_agent:
             return selected_agent
         # auto speaker selection
@@ -363,7 +350,7 @@ class GroupChatManager(ConversableAgent):
         print("Chat End call back")
         self.on_chat_end = callback
     
-    def run_chat(
+    async def run_chat(
         self,
         messages: Optional[List[Dict]] = None,
         sender: Optional[Agent] = None,
@@ -398,7 +385,7 @@ class GroupChatManager(ConversableAgent):
                 if self.on_chat_start:
                     self.on_chat_start()  
                 # select the next speaker
-                speaker = groupchat.select_speaker(speaker, self)
+                speaker = await groupchat.select_speaker(speaker, self)
                 # let the speaker speak
                 reply = speaker.generate_reply(sender=self)
                 if self.on_chat_end:
